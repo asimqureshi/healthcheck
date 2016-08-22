@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!--<meta name="viewport" content="width=device-width, initial-scale=1.0"/>-->
+
+    <title>Hello WebSocket</title>
+    <script src="js/websocket/sockjs-0.3.4.js"></script>
+    <script src="js/websocket/stomp.js"></script>
+    <!--<script src="js/jquery-3.1.0/jquery-3.1.0.min.js"></script>-->
+    <script type="text/javascript" src="https://code.jquery.com/jquery-1.12.3.js"></script>
+
+    <!--<script src="js/jsgrid-1.5.1/jsgrid.min.js"></script>-->
+    <!--<script src="js/datatables/jquery.dataTables.js"></script>-->
+
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/dt-1.10.12/datatables.css"/>
+
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.12/js/jquery.dataTables.min.js"></script>
+
+    <!--<link href="http://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">-->
+
+
+    <!--&lt;!&ndash; Compiled and minified CSS &ndash;&gt;-->
+    <!--<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.7/css/materialize.min.css">-->
+
+    <!--&lt;!&ndash; Compiled and minified JavaScript &ndash;&gt;-->
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.7/js/materialize.min.js"></script>-->
+
+    <script type="text/javascript">
+
+        $(function(){
+            $('#datagrid').DataTable( {
+                                         // data: messageObj,
+                                          columns: [
+                                              { data: 'id' },
+                                              { data: 'application' },
+                                              { data: 'service' },
+                                              { data: 'status' },
+                                              { data: 'error' },
+                                              { data: 'timestamp' },
+                                              { data: 'latency' }
+                                          ],
+                                          columnDefs: [
+                                              { "width": "30%",  "targets": 0 },
+                                              { "width": "15%", "targets": 1 },
+                                              { "width": "15%", "targets": 2 },
+                                              { "width": "10%", "targets": 3 },
+                                              { "width": "10%", "targets": 4 },
+                                              { "width": "10%", "targets": 5 },
+                                              { "width": "10%", "targets": 6 }
+                                          ],
+                                          paging:false,
+                                          select:false,
+                                          ordering:false,
+                                          info:false
+
+                                      } );
+        })
+
+        var stompClient = null;
+
+        function setConnected(connected) {
+            document.getElementById('connect').disabled = connected;
+            document.getElementById('disconnect').disabled = !connected;
+            document.getElementById('conversationDiv').style.visibility = connected ? 'visible' : 'hidden';
+            document.getElementById('response').innerHTML = '';
+        }
+
+        function connect() {
+            var socket = new SockJS('/hello');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function(frame) {
+                setConnected(true);
+                console.log('Connected: ' + frame);
+                stompClient.subscribe('/topic/hc-web-queue', function(greeting){
+                    console.log(greeting);
+                    showHealthEvent(greeting.body);
+                });
+            });
+        }
+
+        function disconnect() {
+            if (stompClient != null) {
+                stompClient.disconnect();
+            }
+            setConnected(false);
+            console.log("Disconnected");
+        }
+
+        function ping() {
+
+            var allVals = [];
+
+            $('input[name="apps"]:checked').each(function() {
+                allVals.push($(this).val());
+            });
+
+           var apps = JSON.stringify(allVals);
+
+            console.log(apps);
+            stompClient.send("/app/hello", {}, apps);
+        }
+
+        function showHealthEvent(message) {
+            var messages = JSON.parse(message);
+            var t = $('#datagrid').DataTable();
+            for (var i = 0; i < messages.length; i++) {
+                t.row.add(messages[i]);
+            }
+            t.draw();
+        }
+
+        function clearTable(){
+            var t = $('#datagrid').DataTable();
+            t.clear().draw();
+        }
+
+
+    </script>
+</head>
+<body onload="disconnect()">
+<noscript><h2 style="color: #ff0000">Seems your browser doesn't support Javascript! Websocket relies on Javascript being enabled. Please enable
+    Javascript and reload this page!</h2></noscript>
+<div>
+    <div>
+        <button id="connect" onclick="connect();">Connect</button>
+        <button id="disconnect" disabled="disabled" onclick="disconnect();">Disconnect</button>
+    </div>
+    <div id="conversationDiv">
+        <!--<label>What is your name?</label><input type="text" id="name" />-->
+        <button id="ping" onclick="ping();">Ping</button>
+        <input type="checkbox" name="apps" value="FIS" checked="true"/> FIS
+        <input type="checkbox" name="apps" value="VC" checked="true"/>  VC
+        <button id="clear" onclick="clearTable();">Clear</button>
+        <p id="response"></p>
+    </div>
+    <div id="datagrid-container">
+        <table id="datagrid" class="table-hover" style="text-align: center">
+            <thead>
+            <tr>
+                <th style="text-align: center">Request Id</th>
+                <th style="text-align: center">Application</th>
+                <th style="text-align: center">Service</th>
+                <th style="text-align: center">Status</th>
+                <th style="text-align: center">Error</th>
+                <th style="text-align: center">Timestamp</th>
+                <th style="text-align: center">Latency</th>
+            </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+    </div>
+</div>
+</body>
+</html>
